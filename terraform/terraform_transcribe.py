@@ -3,6 +3,8 @@ import snowflake.connector
 import configparser
 
 
+
+
 class terraform_transcribe:
     
     def __init__(self, config_file):

@@ -3,7 +3,68 @@ import snowflake.connector
 import configparser
 import re
 
+
+"""
+NOTES
+
+## Before Running Script
+1. Create a temporary rsa user with accountadmin role in the source account
+2. Create a new account in the same organization
+3. Create a temporary rsa user with accountadmin role in the target account
+4. Create/Update the .config file with the credentials for the source and target account
+
+## Running The Script
+1. Define objects that should be copied over
+2. Run the script
+3. Review any objects that couldn't be created (exception handling not added yet)
+4. *Delete the users created for the account replication process
+
+### Inputs
+- Config file (with source and target account info)
+- source_config_name (default is "snowflake_source_account", see example_cred.config)
+- target_config_name (default is "snowflake_target_account", see example_cred.config)
+
+### Object Options
+- Database Objects (get ddl)
+    - SCHEMA
+    - TABLE
+    - VIEW – includes materialized views  
+
+- Account Objects
+  - Warehouse
+  - Users
+  - Roles
+  - Grants
+
+- Not supported yet:
+    - STREAM
+    - SEQUENCE
+    - PIPE
+    - FILE_FORMAT
+    - FUNCTION – User Defined Functions
+    - PROCEDURE – stored procedures  
+    - Future Grants
+
+### Dependencies
+- Pandas
+- Snowflake connector
+- Configparser
+- regex
+
+### Considerations
+- The intended usage is to update a brand new Snowflake account with the account and database objects of another account. It is not intended to update an existing account. 
+- Created user accounts will created with a default password ("pass123") unless manually specified (SSO is not preserved)
+- The "grantee" of roles/users will not be preserved as the temporary user will create all the objects and grants
+- The accountadmin will be the owner of all new objects (to be udpdated in future versions)
+- Exception handling in progress
+"""
+
+
+
+
 def parse_credentials(config_file, config_name):
+    """ helper function to create snowflake connection and cursor """
+
     credentials = configparser.ConfigParser()
     credentials.read(config_file)
 
@@ -25,14 +86,32 @@ def parse_credentials(config_file, config_name):
 
 
 class transcribe_snowflake_account:
-    def __init__(self, config_file, source_config_name='snowflake_source_account', target_config_name='snowflake_target_account'):
-        
+    """
+    A class for copying objects from one snowflake account to another
+
+    Attributes:
+        config_file : str
+            the path of the config file that contains snowflake credentials for two accounts
+            currently only password authentication is supported
+        source_config_name : str
+            the name of the header in the config file for the snowflake source account credentials
+        target_config_name : str
+            the name of the header in the config file for the snowflake source account credentials
+
+    """
+    def __init__(self, config_file, source_config_name='snowflake_source_account',
+                 target_config_name='snowflake_target_account'):
+
         self.source_conn, self.source_cur = parse_credentials(config_file, source_config_name)
         self.target_conn, self.target_cur = parse_credentials(config_file, target_config_name)
         
         
     def database_objects(self):
-        
+        """ - Reads databases from the source account
+            - Creates databases in the target account
+            - Outputs a list of sql for dropping objects
+        """
+
         sql = 'show databases'
         df_db = pd.read_sql(sql, self.source_conn)
 
@@ -58,7 +137,10 @@ class transcribe_snowflake_account:
     
     
     def roles(self):
-        
+        """ - Reads roles from the source account
+            - Creates roles in the target account
+            - Outputs a list of sql for dropping objects
+        """
         # don't re-create default roles
         sql = """select * from snowflake.account_usage.roles
                     where name not like 'PUBLIC' and
@@ -81,11 +163,13 @@ class transcribe_snowflake_account:
       
         
     def users(self):
-        # Create Users
-        ## Can assign default roles from step 3
-        ## recreate - name, login_name, display_name, default_role, email
-        
-        ## Ingore default snowflake role and the user who was used to create the account
+        """ - Reads users from the source account
+            - Creates users in the target account
+            - Outputs a list of sql for dropping objects
+            - Users created with: name, login_name, display_name, default_role, email
+        """
+
+        # Ingore default snowflake role and the user who was used to create the account
         sql = """select * from snowflake.account_usage.users
                 where name not like 'SNOWFLAKE' and
                 created_on not in (SELECT min(created_on) FROM snowflake.account_usage.users);"""
@@ -138,6 +222,12 @@ class transcribe_snowflake_account:
     
     
     def warehouses(self):
+        """ - Reads warehouses from the source account
+            - Creates warehouses in the target account
+            - Outputs a list of sql for dropping objects
+            - Warehouses created with: name, size
+        """
+
         sql = """show warehouses;"""
         df_wh = pd.read_sql(sql, self.source_conn)
 
@@ -158,6 +248,11 @@ class transcribe_snowflake_account:
     
     
     def user_role_grants(self):
+        """ - Reads grants from the source account
+            - Creates role grants for users in the target account
+            - Future grants not supported yet
+        """
+
         sql = """select * from snowflake.account_usage.grants_to_users;"""
         df_user_grants = pd.read_sql(sql, self.source_conn)
 
@@ -172,6 +267,11 @@ class transcribe_snowflake_account:
         
         
     def role_role_grants(self):    
+        """ - Reads grants from the source account
+            - Creates role grants for roles in the target account
+            - Future grants not supported yet
+        """
+
         sql = """select * from snowflake.account_usage.grants_to_roles;"""
         df_grants = pd.read_sql(sql, self.source_conn)
         
@@ -188,6 +288,11 @@ class transcribe_snowflake_account:
 
         
     def role_object_grants(self):
+        """ - Reads grants from the source account
+            - Creates object grants for roles in the target account
+            - Future grants not supported yet
+        """
+        
         ## Ingore Account, Integration, User, Role object types
         ## privelige -> object_type -> object_name : to role (grantee) 
         sql = """select * from snowflake.account_usage.grants_to_roles;"""
@@ -237,6 +342,8 @@ class transcribe_snowflake_account:
         
         
     def copy_account(self):
+        """ Function to create all objects. Specific object selection not supported yet """
+
         self.db_drop_sql_list = self.database_objects()
         self.drop_user_sql_list = self.users()
         self.drop_roles_sql_list = self.roles()
@@ -253,6 +360,9 @@ class transcribe_snowflake_account:
         [self.target_cur.execute(sql) for sql in sql_drop_list]
         print("dropped objects")
         
+
+# if you wan't to run the script direclty either use a config file called 'snowflake.config' 
+# or change the config file name
 
 if __name__== "__main__":
     # test running from config file called snowflake.config
