@@ -10,6 +10,7 @@
 1. Define objects that should be copied over
 2. Run the script
 3. Review any objects that couldn't be created (exception handling not added yet)
+4. *Delete the users created for the account replication process
 
 ### Inputs
 - Config file (with source and target account info)
@@ -18,7 +19,6 @@
 
 ### Object Options
 - Database Objects (get ddl)
-  - Options to specify:
     - SCHEMA
     - TABLE
     - VIEW – includes materialized views  

@@ -20,7 +20,7 @@
 
 #### Supported Objects
 - Database Objects (get ddl)
-  - Options to specify:
+    - DATABASE
     - SCHEMA
     - TABLE
     - VIEW – includes materialized views  

@@ -137,13 +137,13 @@ class terraform_transcribe:
     
     def generate_files(self):
         tf_roles_all = self.create_role_resource()
-        with open('tf_roles.txt', 'w') as f:
+        with open('tf_roles.tf', 'w') as f:
             f.write(tf_roles_all)
         tf_users_all = self.create_user_resource()
-        with open('tf_users.txt', 'w') as f:
+        with open('tf_users.tf', 'w') as f:
             f.write(tf_users_all)
         tf_grants_all = self.create_role_grants_resource()
-        with open('tf_grants.txt', 'w') as f:
+        with open('tf_grants.tf', 'w') as f:
             f.write(tf_grants_all)
 
 
