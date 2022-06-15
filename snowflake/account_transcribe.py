@@ -101,7 +101,7 @@ class transcribe_snowflake_account:
     """
     def __init__(self, config_file, source_config_name='snowflake_source_account',
                  target_config_name='snowflake_target_account'):
-
+        """ Inits class with cursors and connections for snowflake accounts """
         self.source_conn, self.source_cur = parse_credentials(config_file, source_config_name)
         self.target_conn, self.target_cur = parse_credentials(config_file, target_config_name)
         
@@ -354,6 +354,7 @@ class transcribe_snowflake_account:
         print("created account objects")
         
     def drop_added_objects(self):
+        """ Drops all created objects (needs additional testing). Depends on copy_account being ran """
         sql_drop_list = self.db_drop_sql_list + self.drop_user_sql_list + \
                             self.drop_roles_sql_list + self.drop_wh_list
         
